@@ -1,0 +1,64 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+// Compute modular inverse of a mod 26
+int modInverse(int a) {
+    for (int i = 1; i < 26; i++) {
+        if ((a * i) % 26 == 1)
+            return i;
+    }
+    return -1; // No inverse
+}
+
+// Decrypt a single character
+char decryptChar(char c, int a_inv, int b) {
+    if (isalpha(c)) {
+        int x = toupper(c) - 'A';
+        int p = (a_inv * (x - b + 26)) % 26;
+        return p + 'A';
+    }
+    return c;
+}
+
+int main() {
+    char ciphertext[1000];
+
+    printf("Enter the ciphertext (uppercase only): ");
+    fgets(ciphertext, sizeof(ciphertext), stdin);
+    ciphertext[strcspn(ciphertext, "\n")] = '\0';
+
+    // Try all valid a (coprime with 26) and compute b
+    // Based on assumption: E → B and T → U
+    int P1 = 'E' - 'A'; // 4
+    int C1 = 'B' - 'A'; // 1
+    int P2 = 'T' - 'A'; // 19
+    int C2 = 'U' - 'A'; // 20
+
+    for (int a = 1; a < 26; a++) {
+        if (__gcd(a, 26) != 1)
+            continue;
+
+        // Calculate b using one equation
+        int b = (C1 - a * P1 + 26 * 26) % 26;
+
+        // Test second mapping
+        int test = (a * P2 + b) % 26;
+        if (test == C2) {
+            // Found correct a and b
+            int a_inv = modInverse(a);
+            if (a_inv == -1) continue;
+
+            printf("\nLikely Key Found: a = %d, b = %d\n", a, b);
+            printf("Decrypted text:\n");
+
+            for (int i = 0; i < strlen(ciphertext); i++) {
+                printf("%c", decryptChar(ciphertext[i], a_inv, b));
+            }
+            printf("\n");
+            break;
+        }
+    }
+
+    return 0;
+}
