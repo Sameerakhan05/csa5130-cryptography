@@ -1,0 +1,104 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+#define SIZE 5
+
+char matrix[SIZE][SIZE];
+
+// Function to remove duplicates and create key matrix
+void generateKeyMatrix(char *key) {
+    int used[26] = {0}; // Track used characters (ignoring 'j')
+    int x = 0, y = 0;
+
+    for (int i = 0; i < strlen(key); i++) {
+        char ch = tolower(key[i]);
+        if (ch == 'j') ch = 'i'; // Treat j as i
+        if (!isalpha(ch) || used[ch - 'a']) continue;
+
+        matrix[x][y++] = ch;
+        used[ch - 'a'] = 1;
+
+        if (y == SIZE) {
+            y = 0;
+            x++;
+        }
+    }
+
+    // Fill remaining alphabet
+    for (char ch = 'a'; ch <= 'z'; ch++) {
+        if (ch == 'j') continue; // Skip j
+        if (!used[ch - 'a']) {
+            matrix[x][y++] = ch;
+            used[ch - 'a'] = 1;
+
+            if (y == SIZE) {
+                y = 0;
+                x++;
+            }
+        }
+    }
+}
+
+// Function to locate letter in matrix
+void findPosition(char letter, int *row, int *col) {
+    if (letter == 'j') letter = 'i';
+    for (int i = 0; i < SIZE; i++) {
+        for (int j = 0; j < SIZE; j++) {
+            if (matrix[i][j] == letter) {
+                *row = i;
+                *col = j;
+                return;
+            }
+        }
+    }
+}
+
+// Function to prepare plaintext as digraphs
+void prepareText(char *plaintext, char prepared[][3], int *count) {
+    int len = 0;
+    for (int i = 0; plaintext[i] != '\0'; i++) {
+        if (isalpha(plaintext[i])) {
+            plaintext[len++] = tolower(plaintext[i]);
+        }
+    }
+    plaintext[len] = '\0';
+
+    int i = 0, j = 0;
+    while (i < len) {
+        char a = plaintext[i];
+        char b = (i + 1 < len) ? plaintext[i + 1] : 'x';
+
+        if (a == b) {
+            b = 'x';
+            i++;
+        } else {
+            i += 2;
+        }
+
+        prepared[j][0] = a;
+        prepared[j][1] = b;
+        prepared[j][2] = '\0';
+        j++;
+    }
+    if (len % 2 != 0) {
+        prepared[j][0] = plaintext[len - 1];
+        prepared[j][1] = 'x';
+        prepared[j][2] = '\0';
+        j++;
+    }
+    *count = j;
+}
+
+// Encryption function
+void encrypt(char prepared[][3], int count) {
+    printf("Encrypted text: ");
+    for (int i = 0; i < count; i++) {
+        int r1, c1, r2, c2;
+        findPosition(prepared[i][0], &r1, &c1);
+        findPosition(prepared[i][1], &r2, &c2);
+
+        if (r1 == r2) {
+            printf("%c%c", matrix[r1][(c1 + 1) % SIZE], matrix[r2][(c2 + 1) % SIZE]);
+        } else if (c1 == c2) {
+            printf("%c%c
