@@ -1,0 +1,53 @@
+#include <stdio.h>
+
+// Extended Euclidean Algorithm to find modular inverse
+int extended_gcd(int a, int b, int *x, int *y) {
+    if (a == 0) {
+        *x = 0;
+        *y = 1;
+        return b;
+    }
+    int x1, y1;
+    int gcd = extended_gcd(b % a, a, &x1, &y1);
+    *x = y1 - (b / a) * x1;
+    *y = x1;
+    return gcd;
+}
+
+// Find modular inverse of e mod phi
+int mod_inverse(int e, int phi) {
+    int x, y;
+    int gcd = extended_gcd(e, phi, &x, &y);
+    if (gcd != 1) return -1; // No inverse exists
+    else return (x % phi + phi) % phi;
+}
+
+int main() {
+    int e = 31;
+    int n = 3599;
+
+    // Trial factoring of n
+    int p = 59, q = 61; // Manually determined by checking n = p * q
+    int phi = (p - 1) * (q - 1); // Euler's totient function
+
+    int d = mod_inverse(e, phi);
+
+    printf("Public Key (e, n): (%d, %d)\n", e, n);
+    printf("Factors: p = %d, q = %d\n", p, q);
+    printf("φ(n) = %d\n", phi);
+    printf("Private Key d = %d\n", d);
+
+    // Test encryption and decryption
+    int message = 42;
+    long long ciphertext = 1;
+    for (int i = 0; i < e; i++) ciphertext = (ciphertext * message) % n;
+
+    long long decrypted = 1;
+    for (int i = 0; i < d; i++) decrypted = (decrypted * ciphertext) % n;
+
+    printf("\nMessage: %d\n", message);
+    printf("Encrypted: %lld\n", ciphertext);
+    printf("Decrypted: %lld\n", decrypted);
+
+    return 0;
+}
