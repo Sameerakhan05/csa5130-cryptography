@@ -1,0 +1,113 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <openssl/aes.h>
+#include <openssl/rand.h>
+
+#define BLOCK_SIZE 16
+
+// Bit padding: Add 1 bit followed by 0s until block full
+int pad(unsigned char *input, int input_len) {
+    int pad_len = BLOCK_SIZE - (input_len % BLOCK_SIZE);
+    input[input_len] = 0x80; // 10000000
+    for (int i = 1; i < pad_len; i++) {
+        input[input_len + i] = 0x00;
+    }
+    return input_len + pad_len;
+}
+
+void print_hex(const char *label, const unsigned char *data, int len) {
+    printf("%s: ", label);
+    for (int i = 0; i < len; i++)
+        printf("%02X ", data[i]);
+    printf("\n");
+}
+
+void AES_ECB_encrypt(unsigned char *input, unsigned char *output, int length, AES_KEY *key) {
+    for (int i = 0; i < length; i += BLOCK_SIZE)
+        AES_ecb_encrypt(input + i, output + i, key, AES_ENCRYPT);
+}
+
+void AES_ECB_decrypt(unsigned char *input, unsigned char *output, int length, AES_KEY *key) {
+    for (int i = 0; i < length; i += BLOCK_SIZE)
+        AES_ecb_encrypt(input + i, output + i, key, AES_DECRYPT);
+}
+
+void AES_CBC_encrypt(unsigned char *input, unsigned char *output, int length, AES_KEY *key, unsigned char *iv) {
+    unsigned char iv_copy[BLOCK_SIZE];
+    memcpy(iv_copy, iv, BLOCK_SIZE);
+    AES_cbc_encrypt(input, output, length, key, iv_copy, AES_ENCRYPT);
+}
+
+void AES_CBC_decrypt(unsigned char *input, unsigned char *output, int length, AES_KEY *key, unsigned char *iv) {
+    unsigned char iv_copy[BLOCK_SIZE];
+    memcpy(iv_copy, iv, BLOCK_SIZE);
+    AES_cbc_encrypt(input, output, length, key, iv_copy, AES_DECRYPT);
+}
+
+void AES_CFB_encrypt(unsigned char *input, unsigned char *output, int length, AES_KEY *key, unsigned char *iv) {
+    unsigned char iv_copy[BLOCK_SIZE];
+    int num = 0;
+    memcpy(iv_copy, iv, BLOCK_SIZE);
+    AES_cfb128_encrypt(input, output, length, key, iv_copy, &num, AES_ENCRYPT);
+}
+
+void AES_CFB_decrypt(unsigned char *input, unsigned char *output, int length, AES_KEY *key, unsigned char *iv) {
+    unsigned char iv_copy[BLOCK_SIZE];
+    int num = 0;
+    memcpy(iv_copy, iv, BLOCK_SIZE);
+    AES_cfb128_encrypt(input, output, length, key, iv_copy, &num, AES_DECRYPT);
+}
+
+int main() {
+    unsigned char key[BLOCK_SIZE];
+    unsigned char iv[BLOCK_SIZE];
+    RAND_bytes(key, BLOCK_SIZE);
+    RAND_bytes(iv, BLOCK_SIZE);
+
+    unsigned char plaintext[64] = "ConfidentialMsg16BytesBlock!!";
+    int pt_len = strlen((char *)plaintext);
+
+    // Prepare buffers with space for padding
+    unsigned char padded_input[80] = {0};
+    memcpy(padded_input, plaintext, pt_len);
+    int padded_len = pad(padded_input, pt_len); // padded_len = multiple of BLOCK_SIZE
+
+    // Buffers for output
+    unsigned char ecb_cipher[80], cbc_cipher[80], cfb_cipher[80];
+    unsigned char ecb_decrypt[80], cbc_decrypt[80], cfb_decrypt[80];
+
+    AES_KEY enc_key, dec_key;
+    AES_set_encrypt_key(key, 128, &enc_key);
+    AES_set_decrypt_key(key, 128, &dec_key);
+
+    // === ECB ===
+    AES_ECB_encrypt(padded_input, ecb_cipher, padded_len, &enc_key);
+    AES_ECB_decrypt(ecb_cipher, ecb_decrypt, padded_len, &dec_key);
+
+    // === CBC ===
+    AES_CBC_encrypt(padded_input, cbc_cipher, padded_len, &enc_key, iv);
+    AES_CBC_decrypt(cbc_cipher, cbc_decrypt, padded_len, &dec_key, iv);
+
+    // === CFB ===
+    AES_CFB_encrypt(padded_input, cfb_cipher, padded_len, &enc_key, iv);
+    AES_CFB_decrypt(cfb_cipher, cfb_decrypt, padded_len, &dec_key, iv);
+
+    // === Print Results ===
+    printf("Original Padded Plaintext:\n");
+    print_hex("Padded", padded_input, padded_len);
+
+    printf("\n--- ECB ---\n");
+    print_hex("Cipher", ecb_cipher, padded_len);
+    print_hex("Decrypted", ecb_decrypt, padded_len);
+
+    printf("\n--- CBC ---\n");
+    print_hex("Cipher", cbc_cipher, padded_len);
+    print_hex("Decrypted", cbc_decrypt, padded_len);
+
+    printf("\n--- CFB ---\n");
+    print_hex("Cipher", cfb_cipher, padded_len);
+    print_hex("Decrypted", cfb_decrypt, padded_len);
+
+    return 0;
+}
