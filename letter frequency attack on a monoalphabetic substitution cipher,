@@ -1,0 +1,75 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+#define MAX_LEN 1000
+#define NUM_LETTERS 26
+#define NUM_GUESSES 10
+
+// Standard English frequency order (most to least common)
+const char *english_freq_order = "ETAOINSHRDLCUMWFGYPBVKJXQZ";
+
+// Function to count frequency of each letter in ciphertext
+void count_frequencies(const char *text, int *freq) {
+    for (int i = 0; text[i]; i++) {
+        if (isalpha(text[i])) {
+            char ch = toupper(text[i]);
+            freq[ch - 'A']++;
+        }
+    }
+}
+
+// Sort letters by frequency (descending)
+void sort_by_frequency(int *freq, char *sorted_letters) {
+    int used[NUM_LETTERS] = {0};
+
+    for (int i = 0; i < NUM_LETTERS; i++) {
+        int max_idx = -1;
+        for (int j = 0; j < NUM_LETTERS; j++) {
+            if (!used[j] && (max_idx == -1 || freq[j] > freq[max_idx]))
+                max_idx = j;
+        }
+        sorted_letters[i] = 'A' + max_idx;
+        used[max_idx] = 1;
+    }
+}
+
+// Apply substitution mapping
+void apply_mapping(const char *ciphertext, char *plaintext, const char *map) {
+    for (int i = 0; ciphertext[i]; i++) {
+        if (isalpha(ciphertext[i])) {
+            char ch = toupper(ciphertext[i]);
+            char mapped = map[ch - 'A'];
+            plaintext[i] = islower(ciphertext[i]) ? tolower(mapped) : mapped;
+        } else {
+            plaintext[i] = ciphertext[i];
+        }
+    }
+    plaintext[strlen(ciphertext)] = '\0';
+}
+
+int main() {
+    char ciphertext[MAX_LEN], plaintext[MAX_LEN];
+    int freq[NUM_LETTERS] = {0};
+    char sorted_letters[NUM_LETTERS + 1] = {0};
+    char map[NUM_LETTERS];
+
+    printf("Enter ciphertext:\n");
+    fgets(ciphertext, MAX_LEN, stdin);
+    ciphertext[strcspn(ciphertext, "\n")] = 0;
+
+    count_frequencies(ciphertext, freq);
+    sort_by_frequency(freq, sorted_letters);
+
+    printf("\nTop %d possible plaintext guesses:\n", NUM_GUESSES);
+    for (int guess = 0; guess < NUM_GUESSES && guess < NUM_LETTERS; guess++) {
+        for (int i = 0; i < NUM_LETTERS; i++) {
+            map[sorted_letters[i] - 'A'] = english_freq_order[(i + guess) % NUM_LETTERS];
+        }
+        apply_mapping(ciphertext, plaintext, map);
+        printf("%2d: %s\n", guess + 1, plaintext);
+    }
+
+    return 0;
+}
