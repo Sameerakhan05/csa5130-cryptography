@@ -1,0 +1,100 @@
+#include <stdio.h>
+#include <string.h>
+
+// PC-1: 64-bit -> 56-bit key (drops parity bits)
+int PC1[56] = {
+    57,49,41,33,25,17,9,
+    1,58,50,42,34,26,18,
+    10,2,59,51,43,35,27,
+    19,11,3,60,52,44,36,
+    63,55,47,39,31,23,15,
+    7,62,54,46,38,30,22,
+    14,6,61,53,45,37,29,
+    21,13,5,28,20,12,4
+};
+
+// PC-2: 56-bit (C+D) -> 48-bit subkey
+int PC2[48] = {
+    14,17,11,24,1,5,
+    3,28,15,6,21,10,
+    23,19,12,4,26,8,
+    16,7,27,20,13,2,
+    41,52,31,37,47,55,
+    30,40,51,45,33,48,
+    44,49,39,56,34,53,
+    46,42,50,36,29,32
+};
+
+// Shift schedule per round
+int SHIFTS[16] = {
+    1, 1, 2, 2, 2, 2, 2, 2,
+    1, 2, 2, 2, 2, 2, 2, 1
+};
+
+// Circular left shift
+void leftShift(int *arr, int n) {
+    int tmp[28];
+    for (int i = 0; i < 28; i++) {
+        tmp[i] = arr[(i + n) % 28];
+    }
+    memcpy(arr, tmp, sizeof(int) * 28);
+}
+
+// Apply permutation
+void permute(int *input, int *output, int *table, int size) {
+    for (int i = 0; i < size; i++) {
+        output[i] = input[table[i] - 1];
+    }
+}
+
+// Display a bit array as a binary string
+void printBits(const int *bits, int len) {
+    for (int i = 0; i < len; i++) {
+        printf("%d", bits[i]);
+    }
+    printf("\n");
+}
+
+int main() {
+    // Example 64-bit key (with parity bits)
+    int key64[64] = {
+        0,1,1,0,1,1,0,1, 1,0,0,1,1,0,1,0,
+        1,1,1,0,1,0,0,1, 1,0,1,1,1,0,0,1,
+        0,1,1,1,0,1,0,0, 1,0,1,0,1,0,1,1,
+        1,0,1,1,0,0,1,1, 0,1,1,0,0,1,0,1
+    };
+
+    int key56[56];           // After PC1
+    int C[28], D[28];        // Halves of key
+    int subkey[48];          // Subkey after PC2
+
+    // Step 1: Apply PC1
+    permute(key64, key56, PC1, 56);
+
+    // Step 2: Split into C and D
+    memcpy(C, key56, sizeof(int) * 28);
+    memcpy(D, key56 + 28, sizeof(int) * 28);
+
+    // Perform key generation for one round (can loop 16 times)
+    leftShift(C, SHIFTS[0]);
+    leftShift(D, SHIFTS[0]);
+
+    int CD[56];
+    memcpy(CD, C, 28 * sizeof(int));
+    memcpy(CD + 28, D, 28 * sizeof(int));
+
+    // Step 3: Apply PC2 to generate subkey
+    permute(CD, subkey, PC2, 48);
+
+    // Step 4: Display output
+    printf("Generated Subkey (Round 1):\n");
+    printBits(subkey, 48);
+
+    printf("\nFirst 24 bits of subkey (from C only):\n");
+    printBits(subkey, 24);
+
+    printf("\nLast 24 bits of subkey (from D only):\n");
+    printBits(subkey + 24, 24);
+
+    return 0;
+}
