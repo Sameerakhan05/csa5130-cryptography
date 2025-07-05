@@ -1,0 +1,68 @@
+#include <stdio.h>
+
+// Function to compute gcd
+int gcd(int a, int b) {
+    while (b != 0) {
+        int tmp = b;
+        b = a % b;
+        a = tmp;
+    }
+    return a;
+}
+
+// Extended Euclidean Algorithm to find modular inverse
+int extended_gcd(int a, int b, int *x, int *y) {
+    if (a == 0) {
+        *x = 0;
+        *y = 1;
+        return b;
+    }
+    int x1, y1;
+    int gcd = extended_gcd(b % a, a, &x1, &y1);
+    *x = y1 - (b / a) * x1;
+    *y = x1;
+    return gcd;
+}
+
+int mod_inverse(int e, int phi) {
+    int x, y;
+    int g = extended_gcd(e, phi, &x, &y);
+    if (g != 1) return -1; // no inverse
+    return (x % phi + phi) % phi;
+}
+
+int main() {
+    int n = 3599;        // public modulus
+    int e = 31;          // public exponent
+    int m = 59;          // known plaintext with a common factor with n
+
+    // Step 1: Try to factor n using GCD
+    int factor = gcd(m, n);
+    if (factor == 1 || factor == n) {
+        printf("No factor found with GCD.\n");
+        return 1;
+    }
+
+    int p = factor;
+    int q = n / p;
+    int phi = (p - 1) * (q - 1);
+    int d = mod_inverse(e, phi);
+
+    printf("=== RSA Weakness via GCD ===\n");
+    printf("Known m = %d has common factor with n = %d\n", m, n);
+    printf("Recovered p = %d, q = %d\n", p, q);
+    printf("phi(n) = %d\n", phi);
+    printf("Private key d = %d\n", d);
+
+    // Optional: test decryption
+    int msg = 42;
+    long long cipher = 1;
+    for (int i = 0; i < e; i++) cipher = (cipher * msg) % n;
+
+    long long decrypted = 1;
+    for (int i = 0; i < d; i++) decrypted = (decrypted * cipher) % n;
+
+    printf("\nMessage: %d\nEncrypted: %lld\nDecrypted: %lld\n", msg, cipher, decrypted);
+
+    return 0;
+}
