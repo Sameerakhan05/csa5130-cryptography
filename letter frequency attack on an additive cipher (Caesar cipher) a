@@ -1,0 +1,98 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+#define MAX_LEN 1000
+#define NUM_LETTERS 26
+#define TOP_GUESSES 10
+
+// English letter frequency table (E is most frequent)
+const double english_freq[NUM_LETTERS] = {
+    12.7, 9.1, 8.2, 7.5, 7.0, 6.7, 6.3, 6.1, 5.9, 4.0,
+    2.8, 2.8, 2.4, 2.4, 2.2, 2.0, 1.9, 1.5, 1.0, 0.9,
+    0.8, 0.8, 0.7, 0.2, 0.2, 0.1
+};
+
+// Function to decrypt with a given shift key
+void decrypt_with_key(const char *ciphertext, char *plaintext, int key) {
+    int i;
+    for (i = 0; ciphertext[i]; i++) {
+        if (isalpha(ciphertext[i])) {
+            char base = isupper(ciphertext[i]) ? 'A' : 'a';
+            plaintext[i] = ((ciphertext[i] - base - key + 26) % 26) + base;
+        } else {
+            plaintext[i] = ciphertext[i];
+        }
+    }
+    plaintext[i] = '\0';
+}
+
+// Function to score plaintext by English letter frequency similarity
+double score_plaintext(const char *text) {
+    int letter_count[NUM_LETTERS] = {0};
+    int total_letters = 0;
+
+    for (int i = 0; text[i]; i++) {
+        if (isalpha(text[i])) {
+            letter_count[toupper(text[i]) - 'A']++;
+            total_letters++;
+        }
+    }
+
+    double score = 0.0;
+    if (total_letters == 0) return score;
+
+    for (int i = 0; i < NUM_LETTERS; i++) {
+        double freq = (double)letter_count[i] / total_letters * 100;
+        score += freq * english_freq[i]; // weighted correlation
+    }
+
+    return score;
+}
+
+// Struct to hold guesses
+typedef struct {
+    int key;
+    double score;
+    char plaintext[MAX_LEN];
+} Guess;
+
+// Sort guesses by score descending
+void sort_guesses(Guess guesses[], int n) {
+    for (int i = 0; i < n - 1; i++)
+        for (int j = i + 1; j < n; j++)
+            if (guesses[j].score > guesses[i].score) {
+                Guess temp = guesses[i];
+                guesses[i] = guesses[j];
+                guesses[j] = temp;
+            }
+}
+
+int main() {
+    char ciphertext[MAX_LEN];
+    Guess guesses[NUM_LETTERS];
+    char decrypted[MAX_LEN];
+
+    printf("Enter ciphertext:\n");
+    fgets(ciphertext, MAX_LEN, stdin);
+    ciphertext[strcspn(ciphertext, "\n")] = '\0';
+
+    // Try all 26 possible shifts
+    for (int key = 0; key < NUM_LETTERS; key++) {
+        decrypt_with_key(ciphertext, decrypted, key);
+        guesses[key].key = key;
+        guesses[key].score = score_plaintext(decrypted);
+        strcpy(guesses[key].plaintext, decrypted);
+    }
+
+    // Sort by likelihood
+    sort_guesses(guesses, NUM_LETTERS);
+
+    // Output top guesses
+    printf("\nTop %d Decryption Guesses:\n", TOP_GUESSES);
+    for (int i = 0; i < TOP_GUESSES; i++) {
+        printf("Key = %2d | Score = %7.2f | %s\n", guesses[i].key, guesses[i].score, guesses[i].plaintext);
+    }
+
+    return 0;
+}
