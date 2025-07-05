@@ -1,0 +1,56 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <ctype.h>
+
+#define MAX 1000
+
+// Encrypt with one-time pad Vigenère
+void encrypt_otp_vigenere(char *plaintext, int *key, char *ciphertext) {
+    for (int i = 0; plaintext[i] != '\0'; i++) {
+        if (isalpha(plaintext[i])) {
+            char base = isupper(plaintext[i]) ? 'A' : 'a';
+            ciphertext[i] = ((plaintext[i] - base + key[i]) % 26) + base;
+        } else {
+            ciphertext[i] = plaintext[i]; // Non-alphabetic characters unchanged
+        }
+    }
+    ciphertext[strlen(plaintext)] = '\0';
+}
+
+int main() {
+    char plaintext[MAX];
+    char ciphertext[MAX];
+    int key[MAX];
+
+    srand(time(NULL)); // Seed for random key generation
+
+    // Input plaintext
+    printf("Enter plaintext (letters only, spaces allowed): ");
+    fgets(plaintext, MAX, stdin);
+    plaintext[strcspn(plaintext, "\n")] = 0; // Remove trailing newline
+
+    int len = strlen(plaintext);
+
+    // Generate random key (0 to 25)
+    printf("Random key stream: ");
+    for (int i = 0; i < len; i++) {
+        key[i] = isalpha(plaintext[i]) ? rand() % 26 : 0;
+        if (isalpha(plaintext[i])) {
+            printf("%d ", key[i]);
+        } else {
+            printf("NA ");
+        }
+    }
+    printf("\n");
+
+    // Encrypt
+    encrypt_otp_vigenere(plaintext, key, ciphertext);
+
+    // Output
+    printf("Plaintext : %s\n", plaintext);
+    printf("Ciphertext: %s\n", ciphertext);
+
+    return 0;
+}
