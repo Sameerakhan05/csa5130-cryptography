@@ -1,0 +1,72 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+
+// Block size (in bytes)
+#define BLOCK_SIZE 16
+
+// Simulated block cipher encryption (XOR with key)
+void simple_encrypt(uint8_t *block, uint8_t *key, uint8_t *output) {
+    for (int i = 0; i < BLOCK_SIZE; i++)
+        output[i] = block[i] ^ key[i]; // simple XOR block cipher
+}
+
+// CBC-MAC: Only for 1 or more full blocks
+void cbc_mac(uint8_t *key, uint8_t *message, int length, uint8_t *tag) {
+    uint8_t prev[BLOCK_SIZE] = {0}; // IV = 0
+    uint8_t temp[BLOCK_SIZE];
+
+    for (int i = 0; i < length; i += BLOCK_SIZE) {
+        for (int j = 0; j < BLOCK_SIZE; j++)
+            temp[j] = message[i + j] ^ prev[j];
+
+        simple_encrypt(temp, key, prev);
+    }
+
+    memcpy(tag, prev, BLOCK_SIZE); // Final tag
+}
+
+// Print in hex
+void print_hex(const char *label, uint8_t *data, int len) {
+    printf("%s: ", label);
+    for (int i = 0; i < len; i++)
+        printf("%02X", data[i]);
+    printf("\n");
+}
+
+int main() {
+    // Key (16 bytes)
+    uint8_t key[BLOCK_SIZE] = {
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F
+    };
+
+    // One-block message X
+    uint8_t X[BLOCK_SIZE] = {
+        'A', 'T', 'T', 'A', 'C', 'K', ' ', 'A',
+        'T', ' ', 'D', 'A', 'W', 'N', '!', ' '
+    };
+
+    uint8_t tag1[BLOCK_SIZE];
+    cbc_mac(key, X, BLOCK_SIZE, tag1);
+    print_hex("MAC(X)", tag1, BLOCK_SIZE);
+
+    // Forged second block: (X ⊕ T)
+    uint8_t forged[2 * BLOCK_SIZE];
+    memcpy(forged, X, BLOCK_SIZE); // first block is X
+
+    for (int i = 0; i < BLOCK_SIZE; i++)
+        forged[BLOCK_SIZE + i] = X[i] ^ tag1[i]; // second block = X ⊕ T
+
+    uint8_t tag2[BLOCK_SIZE];
+    cbc_mac(key, forged, 2 * BLOCK_SIZE, tag2);
+    print_hex("MAC(X || X⊕T)", tag2, BLOCK_SIZE);
+
+    // Should match
+    if (memcmp(tag1, tag2, BLOCK_SIZE) == 0)
+        printf("✅ Forgery success: CBC-MAC is equal.\n");
+    else
+        printf("❌ Forgery failed.\n");
+
+    return 0;
+}
