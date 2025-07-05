@@ -1,0 +1,67 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+#define SIZE 26
+
+// Function to generate cipher alphabet using the keyword
+void generateCipher(char cipher[], const char *keyword) {
+    int used[SIZE] = {0};  // Tracks used letters
+    int index = 0;
+
+    // Add keyword characters first (without duplicates)
+    for (int i = 0; keyword[i] != '\0'; i++) {
+        char ch = toupper(keyword[i]);
+        if (isalpha(ch) && !used[ch - 'A']) {
+            cipher[index++] = ch;
+            used[ch - 'A'] = 1;
+        }
+    }
+
+    // Add remaining unused letters in alphabetical order
+    for (char ch = 'A'; ch <= 'Z'; ch++) {
+        if (!used[ch - 'A']) {
+            cipher[index++] = ch;
+        }
+    }
+}
+
+// Function to encrypt the plaintext
+void encrypt(char *plaintext, char *cipher, char *ciphertext) {
+    for (int i = 0; plaintext[i] != '\0'; i++) {
+        char ch = tolower(plaintext[i]);
+        if (isalpha(ch)) {
+            ciphertext[i] = tolower(cipher[ch - 'a']);
+        } else {
+            ciphertext[i] = ch;
+        }
+    }
+    ciphertext[strlen(plaintext)] = '\0';
+}
+
+int main() {
+    char keyword[] = "CIPHER";
+    char cipher[SIZE];
+    char plaintext[100], ciphertext[100];
+
+    // Generate cipher alphabet
+    generateCipher(cipher, keyword);
+
+    printf("Enter plaintext (lowercase only): ");
+    fgets(plaintext, sizeof(plaintext), stdin);
+    plaintext[strcspn(plaintext, "\n")] = '\0';  // Remove newline
+
+    encrypt(plaintext, cipher, ciphertext);
+
+    printf("Encrypted text: %s\n", ciphertext);
+
+    // Optional: Show mapping
+    printf("\nMapping:\n");
+    printf("Plain : ");
+    for (char ch = 'a'; ch <= 'z'; ch++) printf("%c ", ch);
+    printf("\nCipher: ");
+    for (int i = 0; i < SIZE; i++) printf("%c ", tolower(cipher[i]));
+    printf("\n");
+
+    return 0;
+}
