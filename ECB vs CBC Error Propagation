@@ -1,0 +1,77 @@
+#include <stdio.h>
+#include <string.h>
+#include <openssl/aes.h>
+#include <openssl/rand.h>
+
+#define BLOCK_SIZE 16
+
+void print_hex(const char *label, const unsigned char *data, int len) {
+    printf("%s: ", label);
+    for (int i = 0; i < len; ++i)
+        printf("%02X ", data[i]);
+    printf("\n");
+}
+
+// Simulate a bit error in the ciphertext
+void simulate_bit_error(unsigned char *ciphertext, int index) {
+    ciphertext[index] ^= 0x01;  // Flip one bit
+}
+
+int main() {
+    // Input plaintext (must be multiple of 16 bytes)
+    unsigned char plaintext[BLOCK_SIZE * 3] = "BLOCK_ONE_BLOCK_TWO_BLOCK_THREE";
+    int len = strlen((const char *)plaintext);
+    printf("Original Plaintext: %s\n\n", plaintext);
+
+    // AES key (16 bytes) and IV
+    unsigned char key[BLOCK_SIZE];
+    unsigned char iv[BLOCK_SIZE];
+    RAND_bytes(key, BLOCK_SIZE);
+    RAND_bytes(iv, BLOCK_SIZE);
+
+    // Buffers for ECB mode
+    unsigned char ecb_cipher[BLOCK_SIZE * 3];
+    unsigned char ecb_plain[BLOCK_SIZE * 3];
+
+    // Buffers for CBC mode
+    unsigned char cbc_cipher[BLOCK_SIZE * 3];
+    unsigned char cbc_plain[BLOCK_SIZE * 3];
+
+    AES_KEY enc_key, dec_key;
+
+    // === ECB MODE ENCRYPTION ===
+    AES_set_encrypt_key(key, 128, &enc_key);
+    for (int i = 0; i < len; i += BLOCK_SIZE)
+        AES_ecb_encrypt(plaintext + i, ecb_cipher + i, &enc_key, AES_ENCRYPT);
+
+    // Simulate bit error in first block
+    simulate_bit_error(ecb_cipher, 5); // corrupt byte in C1
+
+    AES_set_decrypt_key(key, 128, &dec_key);
+    for (int i = 0; i < len; i += BLOCK_SIZE)
+        AES_ecb_encrypt(ecb_cipher + i, ecb_plain + i, &dec_key, AES_DECRYPT);
+
+    // === CBC MODE ENCRYPTION ===
+    AES_set_encrypt_key(key, 128, &enc_key);
+    unsigned char cbc_iv[BLOCK_SIZE];
+    memcpy(cbc_iv, iv, BLOCK_SIZE);
+
+    AES_cbc_encrypt(plaintext, cbc_cipher, len, &enc_key, cbc_iv, AES_ENCRYPT);
+
+    simulate_bit_error(cbc_cipher, 5); // corrupt byte in C1
+
+    AES_set_decrypt_key(key, 128, &dec_key);
+    memcpy(cbc_iv, iv, BLOCK_SIZE);  // reset IV before decrypt
+    AES_cbc_encrypt(cbc_cipher, cbc_plain, len, &dec_key, cbc_iv, AES_DECRYPT);
+
+    // === OUTPUT ===
+    printf("\n--- ECB MODE ---\n");
+    print_hex("Corrupted ECB Ciphertext", ecb_cipher, len);
+    printf("Decrypted ECB Plaintext:  %.*s\n", len, ecb_plain);
+
+    printf("\n--- CBC MODE ---\n");
+    print_hex("Corrupted CBC Ciphertext", cbc_cipher, len);
+    printf("Decrypted CBC Plaintext:  %.*s\n", len, cbc_plain);
+
+    return 0;
+}
