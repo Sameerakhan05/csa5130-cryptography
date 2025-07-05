@@ -1,0 +1,89 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+
+#define BLOCK_SIZE 8  // Example: 64-bit blocks
+
+// Simulated block cipher: XOR with key
+void block_encrypt(uint8_t *input, uint8_t *key, uint8_t *output) {
+    for (int i = 0; i < BLOCK_SIZE; i++)
+        output[i] = input[i] ^ key[i];
+}
+
+// Padding: 0x80 followed by zeros
+int pad_message(uint8_t *msg, int len) {
+    int pad_len = BLOCK_SIZE - (len % BLOCK_SIZE);
+    msg[len] = 0x80;
+    for (int i = 1; i < pad_len; i++) msg[len + i] = 0x00;
+    return len + pad_len;
+}
+
+// ECB Mode
+void ecb_encrypt(uint8_t *plaintext, int len, uint8_t *key, uint8_t *ciphertext) {
+    for (int i = 0; i < len; i += BLOCK_SIZE)
+        block_encrypt(&plaintext[i], key, &ciphertext[i]);
+}
+
+// CBC Mode
+void cbc_encrypt(uint8_t *plaintext, int len, uint8_t *key, uint8_t *iv, uint8_t *ciphertext) {
+    uint8_t block[BLOCK_SIZE];
+    for (int i = 0; i < len; i += BLOCK_SIZE) {
+        for (int j = 0; j < BLOCK_SIZE; j++)
+            block[j] = plaintext[i + j] ^ iv[j];
+        block_encrypt(block, key, &ciphertext[i]);
+        memcpy(iv, &ciphertext[i], BLOCK_SIZE);
+    }
+}
+
+// CFB Mode
+void cfb_encrypt(uint8_t *plaintext, int len, uint8_t *key, uint8_t *iv, uint8_t *ciphertext) {
+    uint8_t block[BLOCK_SIZE];
+    for (int i = 0; i < len; i += BLOCK_SIZE) {
+        block_encrypt(iv, key, block);
+        for (int j = 0; j < BLOCK_SIZE; j++)
+            ciphertext[i + j] = block[j] ^ plaintext[i + j];
+        memcpy(iv, &ciphertext[i], BLOCK_SIZE);
+    }
+}
+
+// Utility: print hex
+void print_hex(const char *label, uint8_t *data, int len) {
+    printf("%s: ", label);
+    for (int i = 0; i < len; i++) printf("%02X ", data[i]);
+    printf("\n");
+}
+
+int main() {
+    // Sample key and IV
+    uint8_t key[BLOCK_SIZE] = {0x10, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
+    uint8_t iv[BLOCK_SIZE]  = {0xAA, 0xBB, 0xCC, 0xDD, 0x00, 0x11, 0x22, 0x33};
+
+    // Sample plaintext
+    uint8_t plaintext[64] = "HELLO123456789WORLD";  // 19 bytes
+    int len = strlen((char *)plaintext);
+
+    // Pad
+    int new_len = pad_message(plaintext, len);
+
+    // Buffers
+    uint8_t ecb_ct[64] = {0}, cbc_ct[64] = {0}, cfb_ct[64] = {0};
+    uint8_t iv_copy[BLOCK_SIZE];
+
+    memcpy(iv_copy, iv, BLOCK_SIZE);
+    ecb_encrypt(plaintext, new_len, key, ecb_ct);
+
+    memcpy(iv_copy, iv, BLOCK_SIZE);
+    cbc_encrypt(plaintext, new_len, key, iv_copy, cbc_ct);
+
+    memcpy(iv_copy, iv, BLOCK_SIZE);
+    cfb_encrypt(plaintext, new_len, key, iv_copy, cfb_ct);
+
+    // Output
+    print_hex("Padded Plaintext", plaintext, new_len);
+    print_hex("ECB Ciphertext", ecb_ct, new_len);
+    print_hex("CBC Ciphertext", cbc_ct, new_len);
+    print_hex("CFB Ciphertext", cfb_ct, new_len);
+
+    return 0;
+}
