@@ -1,0 +1,86 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+// Function to compute GCD
+int gcd(int a, int b) {
+    while (b != 0) {
+        int t = b;
+        b = a % b;
+        a = t;
+    }
+    return a;
+}
+
+// Function to find modular inverse of a mod 26
+int mod_inverse(int a, int m) {
+    for (int x = 1; x < m; x++) {
+        if ((a * x) % m == 1)
+            return x;
+    }
+    return -1; // No inverse if a not coprime to m
+}
+
+// Encrypt using affine cipher
+char affine_encrypt_char(char p, int a, int b) {
+    if (isalpha(p)) {
+        char base = isupper(p) ? 'A' : 'a';
+        return (char)(((a * (p - base) + b) % 26) + base);
+    }
+    return p;
+}
+
+// Decrypt using affine cipher
+char affine_decrypt_char(char c, int a, int b) {
+    int a_inv = mod_inverse(a, 26);
+    if (a_inv == -1) {
+        printf("Error: No modular inverse exists for a = %d\n", a);
+        exit(1);
+    }
+
+    if (isalpha(c)) {
+        char base = isupper(c) ? 'A' : 'a';
+        return (char)((a_inv * ((c - base - b + 26)) % 26) + base);
+    }
+    return c;
+}
+
+void encrypt_affine(char *plaintext, char *ciphertext, int a, int b) {
+    for (int i = 0; plaintext[i] != '\0'; i++) {
+        ciphertext[i] = affine_encrypt_char(plaintext[i], a, b);
+    }
+    ciphertext[strlen(plaintext)] = '\0';
+}
+
+void decrypt_affine(char *ciphertext, char *plaintext, int a, int b) {
+    for (int i = 0; ciphertext[i] != '\0'; i++) {
+        plaintext[i] = affine_decrypt_char(ciphertext[i], a, b);
+    }
+    plaintext[strlen(ciphertext)] = '\0';
+}
+
+int main() {
+    char plaintext[100], ciphertext[100], decrypted[100];
+    int a, b;
+
+    printf("Enter plaintext (letters only): ");
+    fgets(plaintext, sizeof(plaintext), stdin);
+    plaintext[strcspn(plaintext, "\n")] = 0;
+
+    printf("Enter key values (a b): ");
+    scanf("%d %d", &a, &b);
+
+    if (gcd(a, 26) != 1) {
+        printf("Invalid key: 'a' must be coprime with 26. Decryption will not be possible.\n");
+        return 1;
+    }
+
+    encrypt_affine(plaintext, ciphertext, a, b);
+    decrypt_affine(ciphertext, decrypted, a, b);
+
+    printf("\nEncrypted text: %s\n", ciphertext);
+    printf("Decrypted text: %s\n", decrypted);
+
+    return 0;
+}
