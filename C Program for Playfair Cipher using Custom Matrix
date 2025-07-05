@@ -1,0 +1,89 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+#define SIZE 5
+
+char playfairMatrix[SIZE][SIZE] = {
+    {'M', 'F', 'H', 'I', 'K'},
+    {'U', 'N', 'O', 'P', 'Q'},
+    {'Z', 'V', 'W', 'X', 'Y'},
+    {'E', 'L', 'A', 'R', 'G'},
+    {'D', 'S', 'T', 'B', 'C'}
+};
+
+// Convert 'J' to 'I' and remove non-letters
+void preprocessMessage(const char *input, char *output) {
+    int len = 0;
+    for (int i = 0; input[i]; i++) {
+        if (isalpha(input[i])) {
+            char ch = toupper(input[i]);
+            if (ch == 'J') ch = 'I';
+            output[len++] = ch;
+        }
+    }
+    output[len] = '\0';
+
+    // Insert 'X' between repeated pairs and ensure even length
+    int i = 0;
+    while (output[i] && output[i + 1]) {
+        if (output[i] == output[i + 1]) {
+            memmove(output + i + 1, output + i, strlen(output + i) + 1);
+            output[i + 1] = 'X';
+        }
+        i += 2;
+    }
+    if (strlen(output) % 2 != 0) {
+        output[strlen(output)] = 'X';
+        output[strlen(output) + 1] = '\0';
+    }
+}
+
+// Find position in matrix
+void findPosition(char ch, int *row, int *col) {
+    for (int i = 0; i < SIZE; i++)
+        for (int j = 0; j < SIZE; j++)
+            if (playfairMatrix[i][j] == ch) {
+                *row = i;
+                *col = j;
+                return;
+            }
+}
+
+// Encrypt using Playfair rules
+void encryptPlayfair(const char *message, char *cipher) {
+    int i = 0, k = 0;
+    while (message[i] && message[i + 1]) {
+        char a = message[i], b = message[i + 1];
+        int r1, c1, r2, c2;
+        findPosition(a, &r1, &c1);
+        findPosition(b, &r2, &c2);
+
+        if (r1 == r2) {
+            cipher[k++] = playfairMatrix[r1][(c1 + 1) % SIZE];
+            cipher[k++] = playfairMatrix[r2][(c2 + 1) % SIZE];
+        } else if (c1 == c2) {
+            cipher[k++] = playfairMatrix[(r1 + 1) % SIZE][c1];
+            cipher[k++] = playfairMatrix[(r2 + 1) % SIZE][c2];
+        } else {
+            cipher[k++] = playfairMatrix[r1][c2];
+            cipher[k++] = playfairMatrix[r2][c1];
+        }
+        i += 2;
+    }
+    cipher[k] = '\0';
+}
+
+int main() {
+    const char *input = "Must see you over Cadogan West. Coming at once.";
+    char cleaned[200], cipher[200];
+
+    preprocessMessage(input, cleaned);
+    encryptPlayfair(cleaned, cipher);
+
+    printf("Original Message:\n%s\n", input);
+    printf("\nPreprocessed Message:\n%s\n", cleaned);
+    printf("\nEncrypted Message (Playfair Cipher):\n%s\n", cipher);
+
+    return 0;
+}
