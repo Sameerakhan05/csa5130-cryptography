@@ -1,0 +1,100 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+#define MAX 100
+#define MOD 26
+
+// Convert lowercase char to 0-25
+int charToNum(char c) {
+    return tolower(c) - 'a';
+}
+
+// Convert 0-25 to lowercase char
+char numToChar(int n) {
+    return 'a' + n;
+}
+
+// Encrypt using one-time pad
+void encrypt(const char *plain, const int *key, char *cipher) {
+    for (int i = 0; plain[i]; i++) {
+        if (plain[i] == ' ') {
+            cipher[i] = ' ';
+        } else {
+            int p = charToNum(plain[i]);
+            int c = (p + key[i]) % MOD;
+            cipher[i] = numToChar(c);
+        }
+    }
+    cipher[strlen(plain)] = '\0';
+}
+
+// Decrypt using key
+void decrypt(const char *cipher, const int *key, char *plain) {
+    for (int i = 0; cipher[i]; i++) {
+        if (cipher[i] == ' ') {
+            plain[i] = ' ';
+        } else {
+            int c = charToNum(cipher[i]);
+            int p = (c - key[i] + MOD) % MOD;
+            plain[i] = numToChar(p);
+        }
+    }
+    plain[strlen(cipher)] = '\0';
+}
+
+// Generate key given plaintext and ciphertext
+void generateKey(const char *plain, const char *cipher, int *key) {
+    for (int i = 0; plain[i]; i++) {
+        if (plain[i] == ' ') {
+            key[i] = -1;  // Mark space
+        } else {
+            int p = charToNum(plain[i]);
+            int c = charToNum(cipher[i]);
+            key[i] = (c - p + MOD) % MOD;
+        }
+    }
+}
+
+void printKey(const int *key, int length) {
+    printf("Key Stream: ");
+    for (int i = 0; i < length; i++) {
+        if (key[i] == -1)
+            printf("  ");
+        else
+            printf("%2d ", key[i]);
+    }
+    printf("\n");
+}
+
+int main() {
+    // Part (a)
+    const char *plain1 = "send more money";
+    int key1[] = {9, 0, 1, 7, 23, 15, 21, 14, 11, 11, 2, 8, 9};
+    char cipher1[MAX];
+
+    encrypt(plain1, key1, cipher1);
+
+    printf("Part (a): Encryption\n");
+    printf("Plaintext : %s\n", plain1);
+    printKey(key1, strlen(plain1));
+    printf("Ciphertext: %s\n\n", cipher1);
+
+    // Part (b)
+    const char *plain2 = "cash not needed";
+    const char *cipher2 = cipher1; // Reuse ciphertext from part (a)
+    int key2[MAX];
+
+    generateKey(plain2, cipher2, key2);
+
+    printf("Part (b): Decryption Key Recovery\n");
+    printf("Target Plaintext : %s\n", plain2);
+    printf("Given Ciphertext : %s\n", cipher2);
+    printKey(key2, strlen(plain2));
+
+    char decrypted[MAX];
+    decrypt(cipher2, key2, decrypted);
+    printf("Decrypted Text   : %s\n", decrypted);
+
+    return 0;
+}
