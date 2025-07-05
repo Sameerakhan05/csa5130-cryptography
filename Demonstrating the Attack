@@ -1,0 +1,44 @@
+#include <stdio.h>
+
+// Compute (base^exp) % mod using modular exponentiation
+long long mod_exp(long long base, int exp, long long mod) {
+    long long result = 1;
+    base = base % mod;
+    while (exp > 0) {
+        if (exp % 2 == 1)
+            result = (result * base) % mod;
+        exp = exp >> 1;
+        base = (base * base) % mod;
+    }
+    return result;
+}
+
+// Simulate attacker precomputing all ciphertexts for m = 0..25
+void rsa_dictionary_attack(int e, long long n, long long ciphertext) {
+    printf("\n=== Dictionary Attack ===\n");
+    for (int m = 0; m < 26; m++) {
+        long long c = mod_exp(m, e, n);
+        if (c == ciphertext) {
+            printf("Recovered letter: %c (m = %d)\n", 'A' + m, m);
+            return;
+        }
+    }
+    printf("Letter not found.\n");
+}
+
+int main() {
+    // Example RSA public key
+    int e = 17;
+    long long n = 3233; // Example: n = p * q = 61 * 53 (small for demo)
+
+    // Simulate encrypting letter 'H' = 7
+    int m = 7;
+    long long c = mod_exp(m, e, n);
+
+    printf("Encrypted 'H' (m = 7) → Ciphertext = %lld\n", c);
+
+    // Attacker sees ciphertext and tries dictionary attack
+    rsa_dictionary_attack(e, n, c);
+
+    return 0;
+}
