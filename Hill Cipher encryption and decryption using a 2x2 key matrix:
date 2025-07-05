@@ -1,0 +1,118 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+#define MOD 26
+
+// Key matrix and its inverse
+int key[2][2] = {{9, 4}, {5, 7}};
+int invKey[2][2]; // To be computed
+
+// Find modular inverse of a number mod 26
+int modInverse(int a, int m) {
+    a = a % m;
+    for (int x = 1; x < m; x++)
+        if ((a * x) % m == 1)
+            return x;
+    return -1;
+}
+
+// Compute inverse of 2x2 matrix mod 26
+void computeInverseKey() {
+    int det = (key[0][0]*key[1][1] - key[0][1]*key[1][0]) % MOD;
+    if (det < 0) det += MOD;
+
+    int invDet = modInverse(det, MOD);
+    if (invDet == -1) {
+        printf("Key matrix not invertible!\n");
+        return;
+    }
+
+    invKey[0][0] = ( key[1][1] * invDet) % MOD;
+    invKey[0][1] = (-key[0][1] * invDet) % MOD;
+    invKey[1][0] = (-key[1][0] * invDet) % MOD;
+    invKey[1][1] = ( key[0][0] * invDet) % MOD;
+
+    // Adjust for negative values
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 2; j++)
+            if (invKey[i][j] < 0)
+                invKey[i][j] += MOD;
+}
+
+// Convert char to 0-25
+int charToNum(char c) {
+    return c - 'a';
+}
+
+// Convert 0-25 to char
+char numToChar(int n) {
+    return 'a' + n;
+}
+
+// Clean and prepare plaintext
+void prepareText(const char *input, char *output) {
+    int j = 0;
+    for (int i = 0; input[i]; i++) {
+        if (isalpha(input[i])) {
+            output[j++] = tolower(input[i]);
+        }
+    }
+    if (j % 2 != 0) output[j++] = 'x'; // pad
+    output[j] = '\0';
+}
+
+// Hill encryption
+void encrypt(const char *plain, char *cipher) {
+    for (int i = 0; plain[i]; i += 2) {
+        int a = charToNum(plain[i]);
+        int b = charToNum(plain[i+1]);
+
+        int c1 = (key[0][0]*a + key[0][1]*b) % MOD;
+        int c2 = (key[1][0]*a + key[1][1]*b) % MOD;
+
+        cipher[i] = numToChar(c1);
+        cipher[i+1] = numToChar(c2);
+    }
+    cipher[strlen(plain)] = '\0';
+}
+
+// Hill decryption
+void decrypt(const char *cipher, char *plain) {
+    for (int i = 0; cipher[i]; i += 2) {
+        int a = charToNum(cipher[i]);
+        int b = charToNum(cipher[i+1]);
+
+        int p1 = (invKey[0][0]*a + invKey[0][1]*b) % MOD;
+        int p2 = (invKey[1][0]*a + invKey[1][1]*b) % MOD;
+
+        plain[i] = numToChar(p1);
+        plain[i+1] = numToChar(p2);
+    }
+    plain[strlen(cipher)] = '\0';
+}
+
+int main() {
+    char input[] = "meet me at the usual place at ten rather than eight oclock";
+    char plain[200], cipher[200], decrypted[200];
+
+    // Step 1: Prepare message
+    prepareText(input, plain);
+
+    // Step 2: Compute inverse key
+    computeInverseKey();
+
+    // Step 3: Encrypt
+    encrypt(plain, cipher);
+
+    // Step 4: Decrypt
+    decrypt(cipher, decrypted);
+
+    // Output
+    printf("Original Message:\n%s\n\n", input);
+    printf("Cleaned Plaintext:\n%s\n\n", plain);
+    printf("Encrypted Ciphertext:\n%s\n\n", cipher);
+    printf("Decrypted Plaintext:\n%s\n", decrypted);
+
+    return 0;
+}
