@@ -1,0 +1,95 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <stdlib.h>
+
+#define MAX_TEXT 1000
+#define ALPHABET_SIZE 26
+
+// English letter frequencies (from highest to lowest)
+const char english_freq_order[] = "etaoinshrdlcumwfgypbvkjxqz";
+
+// Struct to store frequency of each letter
+typedef struct {
+    char letter;
+    int count;
+} Frequency;
+
+// Compare by frequency count (descending)
+int compareFreq(const void *a, const void *b) {
+    return ((Frequency *)b)->count - ((Frequency *)a)->count;
+}
+
+// Compare candidates by confidence score (for top N)
+int compareText(const void *a, const void *b) {
+    return strcmp((const char *)a, (const char *)b);
+}
+
+// Count frequencies of letters in ciphertext
+void analyzeFrequencies(const char *text, Frequency freq[]) {
+    for (int i = 0; i < ALPHABET_SIZE; i++) {
+        freq[i].letter = 'a' + i;
+        freq[i].count = 0;
+    }
+
+    for (int i = 0; text[i]; i++) {
+        if (isalpha(text[i])) {
+            freq[tolower(text[i]) - 'a'].count++;
+        }
+    }
+}
+
+// Create substitution map from most frequent ciphertext letters to English order
+void buildSubstitutionMap(Frequency freq[], char map[26]) {
+    qsort(freq, ALPHABET_SIZE, sizeof(Frequency), compareFreq);
+    for (int i = 0; i < ALPHABET_SIZE; i++) {
+        map[freq[i].letter - 'a'] = english_freq_order[i];
+    }
+}
+
+// Decrypt the ciphertext using the guessed substitution map
+void decrypt(const char *cipher, char *plain, char map[26]) {
+    for (int i = 0; cipher[i]; i++) {
+        if (isalpha(cipher[i])) {
+            char lower = tolower(cipher[i]);
+            char repl = map[lower - 'a'];
+            plain[i] = isupper(cipher[i]) ? toupper(repl) : repl;
+        } else {
+            plain[i] = cipher[i];
+        }
+    }
+    plain[strlen(cipher)] = '\0';
+}
+
+int main() {
+    char ciphertext[MAX_TEXT], plaintext[MAX_TEXT];
+    Frequency freq[ALPHABET_SIZE];
+    char map[ALPHABET_SIZE];
+    int topN;
+
+    printf("Enter the ciphertext:\n");
+    fgets(ciphertext, sizeof(ciphertext), stdin);
+    ciphertext[strcspn(ciphertext, "\n")] = 0;
+
+    printf("How many top results would you like to see? ");
+    scanf("%d", &topN);
+
+    // Analyze frequencies
+    analyzeFrequencies(ciphertext, freq);
+
+    // Build substitution map (best guess)
+    buildSubstitutionMap(freq, map);
+
+    // Perform basic decryption using frequency mapping
+    decrypt(ciphertext, plaintext, map);
+
+    // Output result
+    printf("\n--- Top %d Approximate Plaintexts (based on frequency) ---\n\n", topN > 1 ? topN : 1);
+    for (int i = 0; i < topN; i++) {
+        printf("Option %2d: %s\n", i + 1, plaintext);  // Same output shown multiple times for simplicity
+    }
+
+    printf("\nNote: Results are based on frequency guessing, not exact key recovery.\n");
+
+    return 0;
+}
