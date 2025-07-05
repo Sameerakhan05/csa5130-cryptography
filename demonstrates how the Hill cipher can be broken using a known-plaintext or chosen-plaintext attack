@@ -1,0 +1,84 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#define MOD 26
+
+// Function to find determinant of 2x2 matrix mod 26
+int mod_det(int a[2][2]) {
+    return (a[0][0] * a[1][1] - a[0][1] * a[1][0] + MOD) % MOD;
+}
+
+// Find modular inverse of an integer under mod 26
+int mod_inverse(int n) {
+    for (int i = 1; i < MOD; i++)
+        if ((n * i) % MOD == 1)
+            return i;
+    return -1;
+}
+
+// Function to find inverse of 2x2 matrix mod 26
+int inverse_matrix(int in[2][2], int out[2][2]) {
+    int det = mod_det(in);
+    int det_inv = mod_inverse(det);
+    if (det_inv == -1)
+        return 0;
+
+    out[0][0] =  (in[1][1] * det_inv) % MOD;
+    out[0][1] = (-in[0][1] * det_inv + MOD) % MOD;
+    out[1][0] = (-in[1][0] * det_inv + MOD) % MOD;
+    out[1][1] =  (in[0][0] * det_inv) % MOD;
+
+    return 1;
+}
+
+// Multiply 2x2 matrices mod 26
+void multiply(int a[2][2], int b[2][2], int result[2][2]) {
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 2; j++) {
+            result[i][j] = 0;
+            for (int k = 0; k < 2; k++)
+                result[i][j] += a[i][k] * b[k][j];
+            result[i][j] %= MOD;
+        }
+}
+
+// Display a matrix
+void print_matrix(int m[2][2], const char *name) {
+    printf("%s:\n", name);
+    for (int i = 0; i < 2; i++)
+        printf("  %2d %2d\n", m[i][0], m[i][1]);
+}
+
+// Convert text to matrix
+void text_to_matrix(char *text, int m[2][2]) {
+    for (int i = 0; i < 4; i++) {
+        m[i / 2][i % 2] = text[i] - 'A';
+    }
+}
+
+int main() {
+    char plaintext[] = "HELP";    // Known plaintext
+    char ciphertext[] = "ZEBR";   // Known ciphertext
+
+    int P[2][2], C[2][2], P_inv[2][2], K[2][2];
+
+    // Convert text to matrices
+    text_to_matrix(plaintext, P);
+    text_to_matrix(ciphertext, C);
+
+    print_matrix(P, "Plaintext Matrix P");
+    print_matrix(C, "Ciphertext Matrix C");
+
+    if (!inverse_matrix(P, P_inv)) {
+        printf("Plaintext matrix is not invertible (mod 26). Choose a different plaintext.\n");
+        return 1;
+    }
+
+    print_matrix(P_inv, "Inverse of P");
+
+    // Recover key: K = C * P^-1 mod 26
+    multiply(C, P_inv, K);
+    print_matrix(K, "Recovered Key Matrix K");
+
+    return 0;
+}
