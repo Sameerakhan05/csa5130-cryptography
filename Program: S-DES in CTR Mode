@@ -1,0 +1,161 @@
+#include <stdio.h>
+#include <stdint.h>
+
+// Permutation tables
+int P10[] = {3, 5, 2, 7, 4, 10, 1, 9, 8, 6};
+int P8[] = {6, 3, 7, 4, 8, 5, 10, 9};
+int IP[] = {2, 6, 3, 1, 4, 8, 5, 7};
+int IP_INV[] = {4, 1, 3, 5, 7, 2, 8, 6};
+int EP[] = {4, 1, 2, 3, 2, 3, 4, 1};
+int P4[] = {2, 4, 3, 1};
+
+// S-boxes
+int S0[4][4] = {
+    {1,0,3,2},
+    {3,2,1,0},
+    {0,2,1,3},
+    {3,1,3,2}
+};
+
+int S1[4][4] = {
+    {0,1,2,3},
+    {2,0,1,3},
+    {3,0,1,0},
+    {2,1,0,3}
+};
+
+// Permutation helper
+uint16_t permute(uint16_t input, int *perm, int n) {
+    uint16_t out = 0;
+    for (int i = 0; i < n; i++) {
+        out |= ((input >> (10 - perm[i])) & 1) << (n - 1 - i);
+    }
+    return out;
+}
+
+// 5-bit circular left shift
+uint8_t leftShift5(uint8_t val, int shifts) {
+    return ((val << shifts) | (val >> (5 - shifts))) & 0x1F;
+}
+
+// Generate round keys
+void generateKeys(uint16_t key, uint8_t *k1, uint8_t *k2) {
+    uint16_t p10 = permute(key, P10, 10);
+    uint8_t left = (p10 >> 5) & 0x1F;
+    uint8_t right = p10 & 0x1F;
+
+    left = leftShift5(left, 1);
+    right = leftShift5(right, 1);
+    uint16_t combined = (left << 5) | right;
+    *k1 = permute(combined, P8, 8);
+
+    left = leftShift5(left, 2);
+    right = leftShift5(right, 2);
+    combined = (left << 5) | right;
+    *k2 = permute(combined, P8, 8);
+}
+
+// S-box lookup
+uint8_t sbox(uint8_t input, int box[4][4]) {
+    int row = ((input & 0b1000) >> 2) | (input & 0b0001);
+    int col = (input & 0b0110) >> 1;
+    return box[row][col];
+}
+
+// fK function
+uint8_t fk(uint8_t half, uint8_t subkey) {
+    uint8_t ep = 0;
+    for (int i = 0; i < 8; i++)
+        ep |= ((half >> (4 - EP[i])) & 1) << (7 - i);
+
+    uint8_t xor_val = ep ^ subkey;
+    uint8_t left = (xor_val >> 4) & 0xF;
+    uint8_t right = xor_val & 0xF;
+
+    uint8_t s0_out = sbox(left, S0);
+    uint8_t s1_out = sbox(right, S1);
+
+    uint8_t sbox_out = (s0_out << 2) | s1_out;
+    uint8_t p4 = 0;
+    for (int i = 0; i < 4; i++)
+        p4 |= ((sbox_out >> (4 - P4[i])) & 1) << (3 - i);
+
+    return p4;
+}
+
+// S-DES encryption
+uint8_t sdes_encrypt(uint8_t plain, uint8_t k1, uint8_t k2) {
+    uint8_t ip = 0;
+    for (int i = 0; i < 8; i++)
+        ip |= ((plain >> (8 - IP[i])) & 1) << (7 - i);
+
+    uint8_t left = (ip >> 4) & 0xF;
+    uint8_t right = ip & 0xF;
+
+    uint8_t f = fk(right, k1);
+    uint8_t l2 = left ^ f;
+
+    left = right;
+    right = l2;
+
+    f = fk(right, k2);
+    l2 = left ^ f;
+
+    uint8_t preoutput = (l2 << 4) | right;
+
+    uint8_t out = 0;
+    for (int i = 0; i < 8; i++)
+        out |= ((preoutput >> (8 - IP_INV[i])) & 1) << (7 - i);
+
+    return out;
+}
+
+// XOR two 8-bit values
+uint8_t xor8(uint8_t a, uint8_t b) {
+    return a ^ b;
+}
+
+// CTR mode encryption/decryption
+void ctr_mode(uint8_t *input, uint8_t *output, int len, uint16_t key, uint8_t counter_start) {
+    uint8_t k1, k2;
+    generateKeys(key, &k1, &k2);
+
+    uint8_t counter = counter_start;
+
+    for (int i = 0; i < len; i++) {
+        uint8_t keystream = sdes_encrypt(counter, k1, k2);
+        output[i] = xor8(input[i], keystream);
+        counter++;
+    }
+}
+
+// Main Function
+int main() {
+    uint8_t plaintext[3] = {0x01, 0x02, 0x04}; // 00000001 00000010 00000100
+    uint8_t expected_cipher[3] = {0x38, 0x4F, 0x32};
+    uint8_t ciphertext[3];
+    uint8_t decrypted[3];
+
+    uint16_t key = 0x1FD; // 10-bit key: 0111111101
+    uint8_t counter = 0x00; // Starting counter: 00000000
+
+    printf("=== S-DES in Counter (CTR) Mode ===\n");
+    printf("Key:       0x%03X\n", key);
+    printf("Counter:   0x%02X\n", counter);
+
+    // Encryption
+    ctr_mode(plaintext, ciphertext, 3, key, counter);
+    printf("Ciphertext: ");
+    for (int i = 0; i < 3; i++)
+        printf("0x%02X ", ciphertext[i]);
+    printf("\n");
+
+    // Decryption (same as encryption in CTR)
+    ctr_mode(ciphertext, decrypted, 3, key, counter);
+    printf("Decrypted:  ");
+    for (int i = 0; i < 3; i++)
+        printf("0x%02X ", decrypted[i]);
+    printf("\n");
+
+    return 0;
+}
