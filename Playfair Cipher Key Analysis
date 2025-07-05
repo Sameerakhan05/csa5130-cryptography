@@ -1,0 +1,31 @@
+#include <stdio.h>
+#include <math.h>
+
+// Function to calculate log2(n!) using Stirling’s approximation for large factorials
+double log2_factorial(int n) {
+    double pi = acos(-1);
+    double log2_e = log2(exp(1.0));
+    return (n + 0.5) * log2(n) - n * log2_e + 0.5 * log2(2 * pi);
+}
+
+int main() {
+    int total_letters = 25;  // Playfair uses 25 letters (I/J combined)
+
+    // Part 1: Total possible keys (25!)
+    double total_log2_keys = log2_factorial(total_letters);
+
+    // Part 2: Adjust for equivalent keys (dividing by 200)
+    // (25 letters have 25 possible row/col rotations, 4 rotations, and 2 mirrorings)
+    double adjusted_log2_keys = total_log2_keys - log2(200);
+
+    // Display results
+    printf("===== Playfair Cipher Key Analysis =====\n\n");
+
+    printf("Total possible Playfair keys (ignoring equivalent keys):\n");
+    printf("25! ≈ 2^%.1f\n\n", total_log2_keys);
+
+    printf("Effectively unique Playfair keys (accounting for equivalence):\n");
+    printf("25! / 200 ≈ 2^%.1f\n", adjusted_log2_keys);
+
+    return 0;
+}
