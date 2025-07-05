@@ -1,0 +1,113 @@
+#include <stdio.h>
+#include <string.h>
+
+// Constants for DES key generation (partial for brevity)
+
+// PC-1 permutation (from 64 to 56 bits)
+int PC1[] = {
+     57,49,41,33,25,17,9,
+     1,58,50,42,34,26,18,
+    10, 2,59,51,43,35,27,
+    19,11, 3,60,52,44,36,
+    63,55,47,39,31,23,15,
+     7,62,54,46,38,30,22,
+    14, 6,61,53,45,37,29,
+    21,13, 5,28,20,12,4
+};
+
+// PC-2 permutation (from 56 to 48 bits)
+int PC2[] = {
+    14,17,11,24,1,5,
+    3,28,15,6,21,10,
+    23,19,12,4,26,8,
+    16,7,27,20,13,2,
+    41,52,31,37,47,55,
+    30,40,51,45,33,48,
+    44,49,39,56,34,53,
+    46,42,50,36,29,32
+};
+
+// Number of left shifts per round
+int SHIFTS[] = {
+    1, 1, 2, 2, 2, 2, 2, 2,
+    1, 2, 2, 2, 2, 2, 2, 1
+};
+
+// Left circular shift
+void leftShift(int *key_half, int shifts) {
+    int temp[28];
+    for (int i = 0; i < 28; i++) {
+        temp[i] = key_half[(i + shifts) % 28];
+    }
+    memcpy(key_half, temp, 28 * sizeof(int));
+}
+
+// Permutation function
+void permute(int *input, int *output, int *table, int size) {
+    for (int i = 0; i < size; i++) {
+        output[i] = input[table[i] - 1];
+    }
+}
+
+// Convert 64-bit key to 56-bit using PC1
+void applyPC1(int *key_64, int *key_56) {
+    permute(key_64, key_56, PC1, 56);
+}
+
+// Convert 56-bit combined key to 48-bit subkey using PC2
+void applyPC2(int *key_56, int *subkey) {
+    permute(key_56, subkey, PC2, 48);
+}
+
+// Generate 16 subkeys
+void generateSubkeys(int key_64[64], int subkeys[16][48], int reverse) {
+    int key_56[56], C[28], D[28];
+
+    applyPC1(key_64, key_56);
+    memcpy(C, key_56, 28 * sizeof(int));
+    memcpy(D, key_56 + 28, 28 * sizeof(int));
+
+    for (int round = 0; round < 16; round++) {
+        leftShift(C, SHIFTS[round]);
+        leftShift(D, SHIFTS[round]);
+
+        int CD[56];
+        memcpy(CD, C, 28 * sizeof(int));
+        memcpy(CD + 28, D, 28 * sizeof(int));
+
+        int idx = reverse ? 15 - round : round;
+        applyPC2(CD, subkeys[idx]);
+    }
+}
+
+// For demonstration, print generated subkeys
+void printSubkeys(int subkeys[16][48]) {
+    for (int i = 0; i < 16; i++) {
+        printf("K%02d: ", i + 1);
+        for (int j = 0; j < 48; j++) {
+            printf("%d", subkeys[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+// Main function
+int main() {
+    // Example 64-bit key (parity bits included)
+    int key_64[64] = {
+        0,0,1,1,0,1,0,1, 1,1,0,0,1,0,1,1,
+        0,1,1,1,0,1,1,1, 1,0,0,1,1,0,0,1,
+        0,1,0,0,1,1,0,1, 1,0,1,1,0,1,1,0,
+        1,1,0,0,0,0,1,1, 1,0,1,0,0,1,0,1
+    };
+
+    int subkeys[16][48];
+
+    printf("Generating DECRYPTION subkeys (K16 to K1)...\n\n");
+    generateSubkeys(key_64, subkeys, 1);  // 1 = reverse for decryption
+    printSubkeys(subkeys);
+
+    // Additional logic: Decryption rounds would go here
+
+    return 0;
+}
