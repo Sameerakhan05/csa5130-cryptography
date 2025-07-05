@@ -1,0 +1,164 @@
+#include <stdio.h>
+#include <stdint.h>
+
+#define BLOCK_SIZE 8
+
+// ----------------- Permutations and S-Boxes for S-DES -----------------
+
+int P10[] = {3, 5, 2, 7, 4, 10, 1, 9, 8, 6};
+int P8[]  = {6, 3, 7, 4, 8, 5, 10, 9};
+int IP[]  = {2, 6, 3, 1, 4, 8, 5, 7};
+int IP_INV[] = {4, 1, 3, 5, 7, 2, 8, 6};
+int EP[]  = {4, 1, 2, 3, 2, 3, 4, 1};
+int P4[]  = {2, 4, 3, 1};
+
+int S0[4][4] = {
+    {1,0,3,2},
+    {3,2,1,0},
+    {0,2,1,3},
+    {3,1,3,2}
+};
+
+int S1[4][4] = {
+    {0,1,2,3},
+    {2,0,1,3},
+    {3,0,1,0},
+    {2,1,0,3}
+};
+
+// ----------------- Helper Functions -----------------
+
+uint16_t permute(uint16_t input, int *perm, int n) {
+    uint16_t out = 0;
+    for (int i = 0; i < n; i++) {
+        out |= ((input >> (10 - perm[i])) & 1) << (n - 1 - i);
+    }
+    return out;
+}
+
+uint8_t leftShift5(uint8_t val, int shifts) {
+    return ((val << shifts) | (val >> (5 - shifts))) & 0x1F;
+}
+
+void generateKeys(uint16_t key, uint8_t *k1, uint8_t *k2) {
+    uint16_t p10 = permute(key, P10, 10);
+    uint8_t left = (p10 >> 5) & 0x1F;
+    uint8_t right = p10 & 0x1F;
+
+    left = leftShift5(left, 1);
+    right = leftShift5(right, 1);
+    uint16_t combined = (left << 5) | right;
+    *k1 = permute(combined, P8, 8);
+
+    left = leftShift5(left, 2);
+    right = leftShift5(right, 2);
+    combined = (left << 5) | right;
+    *k2 = permute(combined, P8, 8);
+}
+
+uint8_t sbox(uint8_t input, int box[4][4]) {
+    int row = ((input & 0b1000) >> 2) | (input & 0b0001);
+    int col = (input & 0b0110) >> 1;
+    return box[row][col];
+}
+
+uint8_t fk(uint8_t half, uint8_t subkey) {
+    uint8_t ep = 0;
+    for (int i = 0; i < 8; i++)
+        ep |= ((half >> (4 - EP[i])) & 1) << (7 - i);
+
+    uint8_t xor_val = ep ^ subkey;
+    uint8_t left = (xor_val >> 4) & 0xF;
+    uint8_t right = xor_val & 0xF;
+
+    uint8_t s0_out = sbox(left, S0);
+    uint8_t s1_out = sbox(right, S1);
+
+    uint8_t sbox_out = (s0_out << 2) | s1_out;
+    uint8_t p4 = 0;
+    for (int i = 0; i < 4; i++)
+        p4 |= ((sbox_out >> (4 - P4[i])) & 1) << (3 - i);
+
+    return p4;
+}
+
+uint8_t sdes_encrypt(uint8_t plain, uint8_t k1, uint8_t k2) {
+    uint8_t ip = 0;
+    for (int i = 0; i < 8; i++)
+        ip |= ((plain >> (8 - IP[i])) & 1) << (7 - i);
+
+    uint8_t left = (ip >> 4) & 0xF;
+    uint8_t right = ip & 0xF;
+
+    uint8_t f = fk(right, k1);
+    uint8_t l2 = left ^ f;
+
+    // Swap
+    left = right;
+    right = l2;
+
+    f = fk(right, k2);
+    l2 = left ^ f;
+
+    uint8_t preoutput = (l2 << 4) | right;
+
+    uint8_t out = 0;
+    for (int i = 0; i < 8; i++)
+        out |= ((preoutput >> (8 - IP_INV[i])) & 1) << (7 - i);
+
+    return out;
+}
+
+uint8_t sdes_decrypt(uint8_t cipher, uint8_t k1, uint8_t k2) {
+    // Reverse order of keys
+    return sdes_encrypt(cipher, k2, k1);
+}
+
+// ----------------- CBC Mode -----------------
+
+void sdes_cbc_encrypt(uint8_t *plaintext, uint8_t *ciphertext, int len, uint16_t key, uint8_t iv) {
+    uint8_t k1, k2;
+    generateKeys(key, &k1, &k2);
+    uint8_t prev = iv;
+
+    for (int i = 0; i < len; i++) {
+        uint8_t input = plaintext[i] ^ prev;
+        ciphertext[i] = sdes_encrypt(input, k1, k2);
+        prev = ciphertext[i];
+    }
+}
+
+void sdes_cbc_decrypt(uint8_t *ciphertext, uint8_t *plaintext, int len, uint16_t key, uint8_t iv) {
+    uint8_t k1, k2;
+    generateKeys(key, &k1, &k2);
+    uint8_t prev = iv;
+
+    for (int i = 0; i < len; i++) {
+        uint8_t temp = sdes_decrypt(ciphertext[i], k1, k2);
+        plaintext[i] = temp ^ prev;
+        prev = ciphertext[i];
+    }
+}
+
+// ----------------- MAIN -----------------
+
+int main() {
+    uint8_t plaintext[2] = {0x01, 0x23}; // 00000001 00100011
+    uint8_t expected_cipher[2] = {0xF4, 0x0B}; // Expected ciphertext
+    uint8_t ciphertext[2], decrypted[2];
+
+    uint16_t key = 0x1FD; // 0111111101
+    uint8_t iv = 0xAA;    // 10101010
+
+    printf("=== S-DES CBC Mode ===\n");
+    printf("Key:        0x%03X\n", key);
+    printf("IV:         0x%02X\n", iv);
+
+    sdes_cbc_encrypt(plaintext, ciphertext, 2, key, iv);
+    printf("Ciphertext: 0x%02X 0x%02X\n", ciphertext[0], ciphertext[1]);
+
+    sdes_cbc_decrypt(ciphertext, decrypted, 2, key, iv);
+    printf("Decrypted:  0x%02X 0x%02X\n", decrypted[0], decrypted[1]);
+
+    return 0;
+}
