@@ -1,0 +1,65 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <stdbool.h>
+
+#define TOTAL_LANES 25       // 5x5 lanes
+#define RATE_LANES 16        // 1024 bits / 64 bits per lane
+#define CAPACITY_LANES 9     // 576 bits / 64
+
+#define MAX_ROUNDS 10000     // Fail-safe maximum
+
+int main() {
+    srand(time(NULL));
+
+    // Simulate state: 25 lanes (each 64-bit). 1 = has non-zero bit, 0 = all zero
+    int state[TOTAL_LANES] = {0};
+
+    // Step 1: Set input (rate) lanes to non-zero (all have at least one bit)
+    for (int i = 0; i < RATE_LANES; i++) {
+        state[i] = 1;
+    }
+
+    // Step 2: Initialize capacity lanes to zero
+    for (int i = RATE_LANES; i < TOTAL_LANES; i++) {
+        state[i] = 0;
+    }
+
+    bool capacity_nonzero[CAPACITY_LANES] = {0};
+    int steps = 0;
+
+    while (1) {
+        steps++;
+
+        // Simulate diffusion: randomly transfer bits from rate lanes to capacity lanes
+        for (int i = 0; i < CAPACITY_LANES; i++) {
+            int cap_index = RATE_LANES + i;
+            if (state[cap_index] == 0) {
+                // With probability, make it non-zero (simplified)
+                if (rand() % 100 < 30) { // 30% chance per block per lane
+                    state[cap_index] = 1;
+                    capacity_nonzero[i] = true;
+                }
+            }
+        }
+
+        // Check if all capacity lanes are now non-zero
+        bool all_nonzero = true;
+        for (int i = 0; i < CAPACITY_LANES; i++) {
+            if (!capacity_nonzero[i]) {
+                all_nonzero = false;
+                break;
+            }
+        }
+
+        if (all_nonzero) break;
+        if (steps > MAX_ROUNDS) {
+            printf("Exceeded max simulation steps.\n");
+            break;
+        }
+    }
+
+    printf("All capacity lanes became non-zero after %d message blocks.\n", steps);
+
+    return 0;
+}
